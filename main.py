@@ -4,29 +4,10 @@ import streamlit as st
 
 # 페이지 설정
 st.set_page_config(
-    page_title="아우라 AI 스테이지 배틀로얄", page_icon="✨", layout="wide"
+    page_title="아우라 AI 스테이지 배틀로얄", page_icon="✨", layout="centered"
 )
 
-# 등급 리스트 정의 (희귀도 높은 순)
-items = [
-    "𝓣𝓱𝓮 𝓞𝓻𝓲𝓰𝓲𝓷 𝓗𝓪𝓷𝓭", "𝓓𝓻𝓮𝓪𝓶𝓬𝓪𝓽𝓬𝓱𝓮𝓻", "사도:베일", "수확가", "악몽의 하늘", "𝓘𝓬𝓮𝓐𝓰𝓮", "𝓜𝓪𝓶𝓶𝓸𝓽𝓱",
-    "✧ 𝓗𝔂𝓹𝓮𝓻 𝓟𝓻𝓲𝓼𝓶 ✧", "𝓢𝔂𝓶𝓹𝓱𝓸𝓷𝔂♤", "𝓢𝓹𝓮𝓬𝓽𝓻𝓪𝓕𝓵𝓸𝔀 𖤐", "༒ 𝕷𝕰𝕁𝕴𝕬𝕿𝕳𝕬𝕹 ༒", "감시자",
-    "아쿠아리움", "선원", "샤킨", "포세이돈", "에바네샌트",
-    "기원", "망령", "듀라한", "영혼 사냥꾼", "묘화", "밤나팔꽃", "바이탈", "룬(나이트)", "펌프",
-    "블리자드", "이상", "크로마틱", "자장가",
-    "그래피티", "헬리오스", "속력", "황혼",
-    "아파타이트", "대마법사", "아케인", "워록",
-    "테러", "바운디드", "재즈", "스펙터",
-    "이색", "노틸러스", "아쿠아틱",
-    "만년서리", "태양", "달", "와트",
-    "힘", "카와이", "석영", "출혈",
-    "시데리움", "콜라", "빙하", "재",
-    "자력", "글록", "아쿠아마린", "사파이어", "잉크",
-    "에메랄드", "루비", "분노", "토파즈",
-    "결정화", "현기증", "원자", "수소", "레어", "자연",
-    "굿", "희귀", "일반",
-]
-
+# 등급 리스트 및 분모 정의
 denominators = {
     "𝓣𝓱𝓮 𝓞𝓻𝓲𝓰𝓲𝓷 𝓗𝓪𝓷𝓭": 7500000000, "𝓓𝓻𝓮𝓪𝓶𝓬𝓪𝓽𝓬𝓱𝓮𝓻": 2222222222,
     "사도:베일": 800000000, "수확가": 666000000, "악몽의 하늘": 190000000,
@@ -49,6 +30,8 @@ denominators = {
     "결정화": 128, "현기증": 123, "원자": 1180, "수소": 1111, "레어": 16, "자연": 8,
     "굿": 5, "희귀": 4, "일반": 2,
 }
+
+items = list(denominators.keys())
 
 icons = {
     "𝓣𝓱𝓮 𝓞𝓻𝓲𝓰𝓲𝓷 𝓗𝓪𝓷𝓭": "🖐️✨🌌👑", "𝓓𝓻𝓮𝓪𝓶𝓬𝓪𝓽𝓬𝓱𝓮𝓻": "🕸️🌙✨🦋",
@@ -102,193 +85,114 @@ def init_game():
       {"name": name, "aura": "일반", "alive": True}
       for name in AI_NAMES
   ]
-  st.session_state.battle_log = ["게임 시작! 100명(나 + AI 99명)이 1라운드(5천만 확률 컷)를 시작합니다."]
+  st.session_state.battle_log = ["게임 시작! 100명이 1라운드(5천만 확률 컷)를 시작합니다."]
 
-# 세션 상태 초기화 안전 검증
 if "stage" not in st.session_state or "ai_players" not in st.session_state:
   init_game()
 
 st.title("✨ 아우라 AI 스테이지 배틀로얄")
-st.write("각 라운드별 목표 확률(컷라인)을 통과하거나 최종 라운드에서 살아남으세요!")
 
-# 상단 현황판 안전 계산
-alive_ai_count = sum(1 for ai in st.session_state.get("ai_players", []) if ai.get("alive", True))
-my_alive_status = st.session_state.get("my_alive", True)
-total_alive = alive_ai_count + (1 if my_alive_status else 0)
+alive_ai_count = sum(1 for ai in st.session_state.ai_players if ai["alive"])
+total_alive = alive_ai_count + (1 if st.session_state.my_alive else 0)
+stage = st.session_state.stage
 
-stage_names = {1: "1라운드 (5천만 컷)", 2: "2라운드 (7천만 컷)", 3: "3라운드 (1억 컷)", 4: "최종 라운드 (최하위 탈락 서바이벌)"}
+stage_names = {1: "1라운드 (5천만 컷)", 2: "2라운드 (7천만 컷)", 3: "3라운드 (1억 컷)", 4: "최종 라운드 (서바이벌)"}
 
-c_info1, c_info2, c_info3, c_info4 = st.columns(4)
-with c_info1:
-  st.metric(label="🏆 현재 스테이지", value=stage_names.get(st.session_state.get("stage", 1), "진행 중"))
-with c_info2:
-  st.metric(label="👥 총 생존자 수", value=f"{total_alive} / 100명")
-with c_info3:
-  st.metric(label="🙋 내 상태", value="🟢 생존 중" if my_alive_status else "👻 탈락 (관전 중)")
-with c_info4:
-  st.metric(label="✨ 내 마지막 아우라", value=st.session_state.get("my_aura", "일반"))
+st.info(f"🏆 **현재 단계**: {stage_names.get(stage, '')} | 👥 **생존자**: {total_alive}명")
+st.write(f"🙋 **내 상태**: {'🟢 생존 중' if st.session_state.my_alive else '👻 탈락'} (마지막 아우라: {st.session_state.my_aura})")
 
 st.divider()
 
-# 게임 종료 체크
-if total_alive <= 1 or (st.session_state.get("stage", 1) == 4 and total_alive <= 1):
-  winner_name = "없음 (전원 동시 탈락)"
-  if my_alive_status:
-    winner_name = f"👑 {st.session_state.get('my_name', '나')} ({st.session_state.get('my_aura', '일반')})"
-  elif alive_ai_count == 1:
-    last_ai = [ai for ai in st.session_state.get("ai_players", []) if ai.get("alive")]
-    if last_ai:
-      winner_name = f"👑 {last_ai[0]['name']} ({last_ai[0]['aura']})"
-
-  st.success(f"🎉 **배틀 종료! 최종 우승자: {winner_name}**")
-  if st.button("🔄 새 게임 시작하기", type="primary", use_container_width=True):
+if total_alive <= 1 or (stage == 4 and total_alive <= 1):
+  winner = "없음"
+  if st.session_state.my_alive:
+    winner = f"나 ({st.session_state.my_aura})"
+  else:
+    alive_list = [ai for ai in st.session_state.ai_players if ai["alive"]]
+    if alive_list:
+      winner = f"{alive_list[0]['name']} ({alive_list[0]['aura']})"
+  
+  st.success(f"🎉 **게임 종료! 우승자: {winner}**")
+  if st.button("🔄 다시 시작하기", type="primary", use_container_width=True):
     init_game()
     st.rerun()
 else:
-  current_stage = st.session_state.get("stage", 1)
-  if current_stage == 1:
-    btn_label = "🎯 1라운드 시작 (5천만 확률보다 낮은 아우라 뽑기)"
-  elif current_stage == 2:
-    btn_label = "🎯 2라운드 시작 (7천만 확률보다 낮은 아우라 뽑기)"
-  elif current_stage == 3:
-    btn_label = "🎯 3라운드 시작 (1억 확률보다 낮은 아우라 뽑기)"
-  else:
-    btn_label = "🚀 최종 라운드 진행 (매 턴 최하위 자동 탈락)"
-
-  if st.button(btn_label, type="primary", use_container_width=True):
-    st.session_state.round_num = st.session_state.get("round_num", 1) + 1
-    round_rolls = []
-
-    if st.session_state.get("my_alive", True):
+  btn_labels = {
+      1: "🎯 1라운드 진행 (5천만 컷 미만 탈락)",
+      2: "🎯 2라운드 진행 (7천만 컷 미만 탈락)",
+      3: "🎯 3라운드 진행 (1억 컷 미만 탈락)",
+      4: "🚀 최종 라운드 진행 (매턴 최하위 동시 탈락)"
+  }
+  
+  if st.button(btn_labels.get(stage, "다음 진행"), type="primary", use_container_width=True):
+    st.session_state.round_num += 1
+    rolls = []
+    
+    if st.session_state.my_alive:
       my_roll = roll_million_luck()
       st.session_state.my_aura = my_roll
-      round_rolls.append(("me", st.session_state.get("my_name", "나"), my_roll, denominators.get(my_roll, 1)))
-
-    for ai in st.session_state.get("ai_players", []):
-      if ai.get("alive", True):
+      rolls.append(("me", st.session_state.my_name, my_roll, denominators[my_roll]))
+      
+    for ai in st.session_state.ai_players:
+      if ai["alive"]:
         ai_roll = roll_million_luck()
         ai["aura"] = ai_roll
-        round_rolls.append((ai, ai["name"], ai_roll, denominators.get(ai_roll, 1)))
-
-    # 스테이지별 판정 로직
-    if current_stage in [1, 2, 3]:
-      thresholds = {1: 50000000, 2: 70000000, 3: 100000000}
-      target_denom = thresholds[current_stage]
-
-      eliminated_names = []
-      for target, name, aura_name, denom in round_rolls:
-        if denom < target_denom:  # 기준치보다 분모가 작으면 탈락
+        rolls.append((ai, ai["name"], ai_roll, denominators[ai_roll]))
+        
+    if stage in [1, 2, 3]:
+      cutoffs = {1: 50000000, 2: 70000000, 3: 100000000}
+      target_val = cutoffs[stage]
+      
+      for target, name, aura, denom in rolls:
+        if denom < target_val:
           if target == "me":
             st.session_state.my_alive = False
-            eliminated_names.append(f"🙋 {name} [{aura_name}]")
           else:
             target["alive"] = False
-            if len(eliminated_names) < 5:
-              eliminated_names.append(f"{name} [{aura_name}]")
-
-      new_total_alive = (1 if st.session_state.get("my_alive", True) else 0) + sum(1 for ai in st.session_state.get("ai_players", []) if ai.get("alive"))
-      log_msg = f"[Stage {current_stage}] 컷라인 통과 실패자 탈락! 남은 생존자: {new_total_alive}명"
-      st.session_state.battle_log.insert(0, log_msg)
-
-      # 다음 스테이지로 조건 전환
-      if current_stage == 1 and new_total_alive <= 50:
+            
+      new_alive = (1 if st.session_state.my_alive else 0) + sum(1 for ai in st.session_state.ai_players if ai["alive"])
+      st.session_state.battle_log.insert(0, f"[라운드 {st.session_state.round_num}] 컷진행 완료. 남은 생존자: {new_alive}명")
+      
+      if stage == 1 and new_alive <= 50:
         st.session_state.stage = 2
-        st.session_state.battle_log.insert(0, "🔥 2라운드 진입! 컷라인이 7천만으로 강화됩니다.")
-      elif current_stage == 2 and new_total_alive <= 25:
+        st.session_state.battle_log.insert(0, "🔥 2라운드(7천만 컷)로 진입합니다!")
+      elif stage == 2 and new_alive <= 25:
         st.session_state.stage = 3
-        st.session_state.battle_log.insert(0, "🔥 3라운드 진입! 컷라인이 1억으로 강화됩니다.")
-      elif current_stage == 3 and new_total_alive <= 10:
+        st.session_state.battle_log.insert(0, "🔥 3라운드(1억 컷)로 진입합니다!")
+      elif stage == 3 and new_alive <= 10:
         st.session_state.stage = 4
-        st.session_state.battle_log.insert(0, "⚡ 최종 라운드 진입! 이제 매 턴 최하위 아우라를 뽑은 인원이 동시 탈락합니다.")
-
+        st.session_state.battle_log.insert(0, "⚡ 최종 라운드로 진입합니다!")
+        
     else:
-      # 최종 라운드: 최하위 분모 동시 탈락
-      if round_rolls:
-        min_denom = min(r[3] for r in round_rolls)
-        eliminated_names = []
-        for target, name, aura_name, denom in round_rolls:
-          if denom == min_denom:
+      if rolls:
+        min_d = min(r[3] for r in rolls)
+        for target, name, aura, denom in rolls:
+          if denom == min_d:
             if target == "me":
               st.session_state.my_alive = False
-              eliminated_names.append(f"🙋 {name} [{aura_name}]")
             else:
               target["alive"] = False
-              if len(eliminated_names) < 5:
-                eliminated_names.append(f"{name} [{aura_name}]")
-
-        log_msg = f"[최종 라운드] 최하위 등급 (1 in {min_denom:,}) 탈락: {', '.join(eliminated_names)}"
-        st.session_state.battle_log.insert(0, log_msg)
-
+        st.session_state.battle_log.insert(0, f"[최종라운드] 최하위(1 in {min_d:,}) 탈락 발생")
+        
     st.rerun()
 
-st.subheader("📜 실시간 배틀 로그")
-with st.container(border=True):
-  for log in st.session_state.get("battle_log", [])[:8]:
-    st.write(log)
+st.subheader("📜 최근 로그")
+for log in st.session_state.get("battle_log", [])[:5]:
+  st.text(log)
 
 st.divider()
 
-st.subheader("🏆 전체 참가자 현황 (가장 잘 뜬 순위)")
-tab_alive_list, tab_dead_list = st.tabs([f"🟢 생존자 순위 ({total_alive}명)", f"👻 탈락자 현황"])
+st.subheader("🏆 생존자 상위 랭킹 (TOP 10)")
+all_alive = []
+if st.session_state.my_alive:
+  all_alive.append({"name": st.session_state.my_name, "aura": st.session_state.my_aura, "denom": denominators[st.session_state.my_aura]})
+for ai in st.session_state.ai_players:
+  if ai["alive"]:
+    all_alive.append({"name": ai["name"], "aura": ai["aura"], "denom": denominators[ai["aura"]]})
 
-with tab_alive_list:
-  alive_entries = []
-  if st.session_state.get("my_alive", True):
-    alive_entries.append({
-        "name": f"🙋 {st.session_state.get('my_name', '나')}",
-        "aura": st.session_state.get("my_aura", "일반"),
-        "denom": denominators.get(st.session_state.get("my_aura", "일반"), 1),
-        "is_me": True
-    })
-  for ai in st.session_state.get("ai_players", []):
-    if ai.get("alive", True):
-      alive_entries.append({
-          "name": ai["name"],
-          "aura": ai["aura"],
-          "denom": denominators.get(ai["aura"], 1),
-          "is_me": False
-      })
+all_alive.sort(key=lambda x: x["denom"], reverse=True)
 
-  alive_entries.sort(key=lambda x: x["denom"], reverse=True)
-
-  if alive_entries:
-    for rank, entry in enumerate(alive_entries, start=1):
-      icon = icons.get(entry["aura"], "✨")
-      denom_str = f"1 in {entry['denom']:,}"
-      if entry["is_me"]:
-        st.markdown(f"**{rank}위. {entry['name']}** — {icon} **`{entry['aura']}`** (`{denom_str}`)")
-      else:
-        st.markdown(f"{rank}위. **{entry['name']}** — {icon} `{entry['aura']}` (`{denom_str}`)")
-  else:
-    st.info("생존자가 없습니다.")
-
-with tab_dead_list:
-  dead_entries = []
-  if not st.session_state.get("my_alive", True):
-    dead_entries.append({
-        "name": f"🙋 {st.session_state.get('my_name', '나')} (관전 중)",
-        "aura": st.session_state.get("my_aura", "일반"),
-        "denom": denominators.get(st.session_state.get("my_aura", "일반"), 1),
-        "is_me": True
-    })
-  for ai in st.session_state.get("ai_players", []):
-    if not ai.get("alive", True):
-      dead_entries.append({
-          "name": ai["name"],
-          "aura": ai["aura"],
-          "denom": denominators.get(ai["aura"], 1),
-          "is_me": False
-      })
-
-  dead_entries.sort(key=lambda x: x["denom"], reverse=True)
-
-  if dead_entries:
-    for entry in dead_entries[:50]:
-      icon = icons.get(entry["aura"], "✨")
-      denom_str = f"1 in {entry['denom']:,}"
-      if entry["is_me"]:
-        st.markdown(f"- 👻 **{entry['name']}** — 마지막 아우라: {icon} **`{entry['aura']}`** (`{denom_str}`)")
-      else:
-        st.markdown(f"- 👻 **{entry['name']}** — 마지막 아우라: {icon} `{entry['aura']}` (`{denom_str}`)")
-  else:
-    st.caption("아직 탈락자가 없습니다.")
+for i, p in enumerate(all_alive[:10], 1):
+  ic = icons.get(p["aura"], "✨")
+  st.write(f"{i}. **{p['name']}** — {ic} `{p['aura']}` (1 in {p['denom']:,})")
+:
