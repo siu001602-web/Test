@@ -69,7 +69,7 @@ icons = {
     "시데리움": "🌟🛡️", "콜라": "🥤🫧", "빙하": "🧊❄️", "재": "🌫️🔥",
     "자력": "🧲💫", "글록": "🔫💥", "아쿠아마린": "🌊💎", "사파이어": "💙💎", "잉크": "🖋️🖤",
     "에메랄드": "💚💎", "루비": "❤️💎", "분노": "😡💢", "토파즈": "💛💎",
-    "결정화": "🔮✨", "현기증": "😵‍💫🌀", "원자": "⚛️✨", "수소": "🧪✨", "레er": "💙📦", "자연": "🌿🍃",
+    "결정화": "🔮✨", "현기증": "😵‍💫🌀", "원자": "⚛️✨", "수소": "🧪✨", "레어": "💙📦", "자연": "🌿🍃",
     "굿": "👍✨", "희귀": "💧📘", "일반": "⚪📦",
 }
 
@@ -99,13 +99,13 @@ def init_game():
   st.session_state.my_name = "나 (플레이어)"
   st.session_state.my_aura = "일반"
   st.session_state.my_alive = True
-  
+
   generated_names = generate_ai_names(AI_COUNT)
   st.session_state.ai_players = [
       {"name": name, "aura": "일반", "alive": True}
       for name in generated_names
   ]
-  st.session_state.battle_log = ["게임이 시작되었습니다! 나와 9,999명의 AI가 10만 대규모 100만배 행운 배틀을 시작합니다."]
+  st.session_state.battle_log = ["게임이 시작되었습니다! 나와 9,999명의 AI가 1만 명 대규모 100만배 행운 배틀을 시작합니다."]
 
 if "round_num" not in st.session_state:
   init_game()
@@ -174,7 +174,8 @@ else:
             eliminated_names.append(f"🙋 {name} [{aura_name}]")
           else:
             target["alive"] = False
-            if len(eliminated_names) < 5:  지면 로그가 너무 길어지지 않게 최대 5명만 이름 표기
+            # 지면 로그가 너무 길어지지 않게 최대 5명만 이름 표기
+            if len(eliminated_names) < 5:
               eliminated_names.append(f"{name} [{aura_name}]")
 
       summary_str = ", ".join(eliminated_names)
