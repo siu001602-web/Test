@@ -1,12 +1,8 @@
 import random
 import streamlit as st
 
-# 페이지 설정
-st.set_page_config(
-    page_title="아우라 AI 스테이지 배틀로얄", page_icon="✨", layout="centered"
-)
+st.set_page_config(page_title="아우라 AI 스테이지 배틀로얄", page_icon="✨", layout="centered")
 
-# 등급 리스트 및 분모 정의
 denominators = {
     "𝓣𝓱𝓮 𝓞𝓻𝓲𝓰𝓲𝓷 𝓗𝓪𝓷𝓭": 7500000000,
     "𝓓𝓻𝓮𝓪𝓶𝓬𝓪𝓽𝓬𝓱𝓮𝓻": 2222222222,
@@ -196,8 +192,7 @@ def init_game():
     st.session_state.my_aura = "일반"
     st.session_state.my_alive = True
     st.session_state.ai_players = [
-        {"name": name, "aura": "일반", "alive": True}
-        for name in AI_NAMES
+        {"name": name, "aura": "일반", "alive": True} for name in AI_NAMES
     ]
     st.session_state.battle_log = ["게임 시작! 100명이 1라운드(5천만 확률 컷)를 시작합니다."]
 
@@ -263,7 +258,6 @@ else:
             target_val = cutoffs[stage]
             
             for target, name, aura, denom in rolls:
-                # 컷라인보다 분모가 작으면(확률이 낮으면) 탈락
                 if denom < target_val:
                     if target == "me":
                         st.session_state.my_alive = False
