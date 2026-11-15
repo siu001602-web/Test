@@ -1,12 +1,5 @@
-import base64
 from datetime import datetime
-import hashlib
-json = __import__("json")
-os = __import__("os")
-random = __import__("random")
-sqlite3 = __import__("sqlite3")
-time = __import__("time")
-colorsys = __import__("colorsys")
+import random
 import streamlit as st
 
 # 페이지 설정
@@ -69,7 +62,7 @@ icons = {
     "블리자드": "❄️🌨️🌀", "이상": "🌀❓🌌", "크로마틱": "🌈💫", "자장가": "🌌🎵💤",
     "그래피티": "🎨✨", "헬리오스": "☀️🔥", "속력": "⚡💨", "황혼": "🌆✨💜",
     "아파타이트": "💠💎", "대마법사": "🧙‍♂️✨", "아케인": "🔮👑", "워록": "💀🔥",
-    "테러": "💣💥", "바운디드": "🌌👑", "재즈": "🎶🎷", "ส펙터": "👻🔮",
+    "테러": "💣💥", "바운디드": "🌌👑", "재즈": "🎶🎷", "스펙터": "👻🔮",
     "이색": "🌈✨", "노틸러스": "🐚🌊", "아쿠아틱": "💧✨",
     "만년서리": "❄️💎", "태양": "☀️✨", "달": "🌙✨", "와트": "⚡👑⚡",
     "힘": "⚡🔥", "카와이": "🎀💖✨", "석영": "💎✨", "출혈": "🩸⚔️",
@@ -90,121 +83,180 @@ AI_NAMES = [
     "호재원", "고하윤", "노도윤", "도서윤", "모민준", "보채은", "소준서", "아서현", "자도윤", "차채은",
     "카지호", "타서우", "파민준", "하유진", "거시우", "너지안", "더재원", "러하윤", "머도윤", "버서윤",
     "서민준", "어채은", "저준서", "처서현", "커도윤", "터채은", "퍼지호", "호서우", "김민준", "이유진",
-    "박시우", "정지안", "최재원", "강하윤", "조도윤", "윤서윤", "장민준", "한채은"
+    "박시우", "정지안", "최재원", "강하윤", "조도윤", "윤서윤", "장민준", "한채은", "오민서", "서지훈"
 ]
 
-if "battle_initialized" not in st.session_state:
+# 100만배 행운 적용 가챠 함수 (1/1,000,000 이상 등급만 실제 확률 비율대로 추첨)
+MILLION_ELIGIBLE_ITEMS = [it for it in items if denominators[it] >= 1000000]
+MILLION_ELIGIBLE_WEIGHTS = [max(1, int(7500000000000 / denominators[it])) for it in MILLION_ELIGIBLE_ITEMS]
+
+def roll_million_luck():
+  return random.choices(MILLION_ELIGIBLE_ITEMS, weights=MILLION_ELIGIBLE_WEIGHTS, k=1)[0]
+
+def init_game():
   st.session_state.battle_initialized = True
+  st.session_state.round_num = 0
   st.session_state.my_name = "나 (플레이어)"
   st.session_state.my_aura = "일반"
-  st.session_state.my_score = 0
   st.session_state.my_alive = True
-  
-  st.session_state.ai_players = []
-  for name in AI_NAMES:
-    st.session_state.ai_players.append({
-        "name": name,
-        "aura": "일반",
-        "score": 0,
-        "alive": True
-    })
-  st.session_state.battle_log = ["게임이 시작되었습니다! 버튼을 눌러 AI들과 아우라 배틀을 시작하세요."]
+  st.session_state.ai_players = [
+      {"name": name, "aura": "일반", "alive": True}
+      for name in AI_NAMES
+  ]
+  st.session_state.battle_log = ["게임이 시작되었습니다! 나와 100명의 AI가 100만배 행운 배틀을 시작합니다."]
 
-st.title("✨ 아우라 AI 배틀로얄 & 가챠 (관전 모드 지원)")
-st.write("버튼을 누르면 나와 100명의 AI들이 **100만배 행운**으로 아우라를 뽑습니다! 나는 죽어도 관전 모드로 게임에 남습니다.")
+if "battle_initialized" not in st.session_state:
+  init_game()
 
-c_info1, c_info2, c_info3 = st.columns(3)
+st.title("✨ 아우라 AI 배틀로얄 (100만배 행운 서바이벌)")
+st.write("버튼을 누르면 생존자 전원이 **100만배 행운**으로 아우라를 뽑고, **가장 낮은 등급을 뽑은 사람들이 자동으로 동시 탈락**합니다!")
+
+# 상단 현황판
+alive_ai_count = sum(1 for ai in st.session_state.ai_players if ai["alive"])
+total_alive = alive_ai_count + (1 if st.session_state.my_alive else 0)
+
+c_info1, c_info2, c_info3, c_info4 = st.columns(4)
 with c_info1:
-  alive_ai_count = sum(1 for ai in st.session_state.ai_players if ai["alive"])
-  st.metric(label="👥 생존 AI 수", value=f"{alive_ai_count} / 100명")
+  st.metric(label="🔄 진행 라운드", value=f"{st.session_state.round_num} 라운드")
 with c_info2:
-  st.metric(label="🙋 내 상태", value="🛡️ 생존 중" if st.session_state.my_alive else "👻 탈락 (관전 중)")
+  st.metric(label="👥 총 생존자 수", value=f"{total_alive} / 101명")
 with c_info3:
-  st.metric(label="🏆 내 최고 아우라", value=st.session_state.my_aura)
+  st.metric(label="🙋 내 상태", value="🟢 생존 중" if st.session_state.my_alive else "👻 탈락 (관전 중)")
+with c_info4:
+  st.metric(label="✨ 내 마지막 아우라", value=st.session_state.my_aura)
 
 st.divider()
 
-# 배틀 진행 버튼
-if st.button("🚀 전체 100만배 행운 가챠 돌리기 (배틀 1회 진행)", type="primary", use_container_width=True):
-  # 내 뽑기 (100만배 행운 적용: 상위권 아우라 중 랜덤)
-  top_items = items[:40] # 상위 등급 풀
-  my_roll = random.choice(top_items)
-  st.session_state.my_aura = my_roll
-  st.session_state.my_score += denominators.get(my_roll, 1)
+# 게임 종료 여부 체크 및 실행 버튼
+if total_alive <= 1:
+  winner_name = "없음 (전원 동시 탈락)"
+  if st.session_state.my_alive:
+    winner_name = f"👑 {st.session_state.my_name} ({st.session_state.my_aura})"
+  elif alive_ai_count == 1:
+    last_ai = [ai for ai in st.session_state.ai_players if ai["alive"]][0]
+    winner_name = f"👑 {last_ai['name']} ({last_ai['aura']})"
 
-  # AI들 뽑기
-  round_log = f"[{datetime.now().strftime('%H:%M:%S')}] 이번 턴 가챠 결과:"
-  for ai in st.session_state.ai_players:
-    if ai["alive"]:
-      roll = random.choice(top_items)
-      ai["aura"] = roll
-      ai["score"] += denominators.get(roll, 1)
+  st.success(f"🎉 **배틀 종료! 최종 우승자: {winner_name}**")
+  if st.button("🔄 새 게임 시작하기", type="primary", use_container_width=True):
+    init_game()
+    st.rerun()
+else:
+  btn_label = (
+      "🚀 전원 100만배 행운 가챠 & 최하위 자동 탈락 진행"
+      if st.session_state.my_alive
+      else "👁️ [관전 모드] 남은 AI들 100만배 행운 가챠 & 최하위 자동 탈락 진행"
+  )
+  if st.button(btn_label, type="primary", use_container_width=True):
+    st.session_state.round_num += 1
+    round_rolls = []  # (참가자 객체/구분, 이름, 뽑은 아우라, 희귀도 분모)
 
-  st.session_state.battle_log.insert(0, f"✨ 모든 참가자가 100만배 행운으로 아우라를 소환했습니다!")
-  st.rerun()
-
-st.subheader("⚔️ 생존자 관리 및 탈락자 지정 (관리자 패널)")
-st.write("원하는 AI를 직접 탈락시키거나 부활시킬 수 있습니다. (나는 죽어도 관전 모드로 계속 남습니다!)")
-
-col_me, col_ai_mgmt = st.columns([1, 2])
-
-with col_me:
-  with st.container(border=True):
-    st.markdown(f"### 내 정보: {st.session_state.my_name}")
-    st.write(f"현재 아우라: **{icons.get(st.session_state.my_aura, '✨')} {st.session_state.my_aura}**")
-    st.write(f"상태: {'🟢 생존' if st.session_state.my_alive else '👻 탈락 (관전 모드)'}")
+    # 1. 나 뽑기 (생존 상태일 때만)
     if st.session_state.my_alive:
-      if st.button("💀 자진 탈락하기 (관전하기)", use_container_width=True):
-        st.session_state.my_alive = False
-        st.success("탈락하였습니다. 이제 관전 모드로 게임을 계속 지켜봅니다!")
-        st.rerun()
-    else:
-      if st.button("🔄 부활하기", use_container_width=True):
-        st.session_state.my_alive = True
-        st.rerun()
+      my_roll = roll_million_luck()
+      st.session_state.my_aura = my_roll
+      round_rolls.append(("me", st.session_state.my_name, my_roll, denominators[my_roll]))
 
-with col_ai_mgmt:
-  with st.container(border=True):
-    st.markdown("### 🤖 AI 생존/탈락 관리")
-    alive_list = [ai["name"] for ai in st.session_state.ai_players if ai["alive"]]
-    dead_list = [ai["name"] for ai in st.session_state.ai_players if not ai["alive"]]
+    # 2. 생존 AI들 뽑기
+    for ai in st.session_state.ai_players:
+      if ai["alive"]:
+        ai_roll = roll_million_luck()
+        ai["aura"] = ai_roll
+        round_rolls.append((ai, ai["name"], ai_roll, denominators[ai_roll]))
 
-    selected_to_kill = st.selectbox("탈락시킬 AI 선택", ["선택하세요"] + alive_list)
-    if selected_to_kill != "선택하세요":
-      if st.button(f"'{selected_to_kill}' 탈락시키기", type="secondary"):
-        for ai in st.session_state.ai_players:
-          if ai["name"] == selected_to_kill:
-            ai["alive"] = False
-        st.rerun()
+    # 3. 가장 확률 낮은(=분모 숫자가 가장 작은) 아우라 판별 및 동시 탈락 처리
+    if round_rolls:
+      min_denom = min(r[3] for r in round_rolls)
+      eliminated_names = []
 
-    if dead_list:
-      selected_to_revive = st.selectbox("부활시킬 AI 선택", ["선택하세요"] + dead_list)
-      if selected_to_revive != "선택하세요":
-        if st.button(f"'{selected_to_revive}' 부활시키기"):
-          for ai in st.session_state.ai_players:
-            if ai["name"] == selected_to_revive:
-              ai["alive"] = True
-          st.rerun()
+      for target, name, aura_name, denom in round_rolls:
+        if denom == min_denom:
+          if target == "me":
+            st.session_state.my_alive = False
+            eliminated_names.append(f"🙋 {name} [{aura_name}]")
+          else:
+            target["alive"] = False
+            eliminated_names.append(f"{name} [{aura_name}]")
+
+      elim_summary = ", ".join(eliminated_names)
+      log_msg = (
+          f"[Round {st.session_state.round_num}] 최하위 등급 (1 in {min_denom:,}) 탈락 ({len(eliminated_names)}명): {elim_summary}"
+      )
+      st.session_state.battle_log.insert(0, log_msg)
+
+    st.rerun()
+
+# 실시간 배틀 로그
+st.subheader("📜 실시간 탈락 및 배틀 로그")
+with st.container(border=True):
+  for log in st.session_state.battle_log[:8]:
+    st.write(log)
 
 st.divider()
 
-st.subheader("📜 실시간 배틀 로그")
-for log in st.session_state.battle_log[:10]:
-  st.text(log)
-
-st.subheader("📋 전체 참가자 현황 (생존 및 아우라)")
-tab_alive_list, tab_dead_list = st.tabs(["🟢 생존자 목록", "👻 탈락자 (관전) 목록"])
+# 전체 참가자 현황 (가장 잘 뜬 사람 순 정렬)
+st.subheader("🏆 전체 참가자 현황 (가장 잘 뜬 순위)")
+tab_alive_list, tab_dead_list = st.tabs([f"🟢 생존자 순위 ({total_alive}명)", f"👻 탈락자 및 관전 ({101 - total_alive}명)"])
 
 with tab_alive_list:
-  alive_players_data = [ai for ai in st.session_state.ai_players if ai["alive"]]
+  alive_entries = []
   if st.session_state.my_alive:
-    st.markdown(f"- 🟢 **{st.session_state.my_name} (나)** — {icons.get(st.session_state.my_aura, '✨')} `{st.session_state.my_aura}`")
-  for ai in alive_players_data:
-    st.markdown(f"- 🟢 **{ai['name']}** — {icons.get(ai['aura'], '✨')} `{ai['aura']}`")
+    alive_entries.append({
+        "name": f"🙋 {st.session_state.my_name}",
+        "aura": st.session_state.my_aura,
+        "denom": denominators.get(st.session_state.my_aura, 1),
+        "is_me": True
+    })
+  for ai in st.session_state.ai_players:
+    if ai["alive"]:
+      alive_entries.append({
+          "name": ai["name"],
+          "aura": ai["aura"],
+          "denom": denominators.get(ai["aura"], 1),
+          "is_me": False
+      })
+
+  # 희귀도(분모) 높은 순으로 정렬 (가장 잘 뜬 사람이 맨 위)
+  alive_entries.sort(key=lambda x: x["denom"], reverse=True)
+
+  if alive_entries:
+    for rank, entry in enumerate(alive_entries, start=1):
+      icon = icons.get(entry["aura"], "✨")
+      denom_str = f"1 in {entry['denom']:,}"
+      if entry["is_me"]:
+        st.markdown(f"**{rank}위. {entry['name']}** — {icon} **`{entry['aura']}`** (`{denom_str}`)")
+      else:
+        st.markdown(f"{rank}위. **{entry['name']}** — {icon} `{entry['aura']}` (`{denom_str}`)")
+  else:
+    st.info("생존자가 없습니다.")
 
 with tab_dead_list:
-  dead_players_data = [ai for ai in st.session_state.ai_players if not ai["alive"]]
+  dead_entries = []
   if not st.session_state.my_alive:
-    st.markdown(f"- 👻 **{st.session_state.my_name} (나)** — (관전 중)")
-  for ai in dead_players_data:
-    st.markdown(f"- 👻 **{ai['name']}**")
+    dead_entries.append({
+        "name": f"🙋 {st.session_state.my_name} (관전 중)",
+        "aura": st.session_state.my_aura,
+        "denom": denominators.get(st.session_state.my_aura, 1),
+        "is_me": True
+    })
+  for ai in st.session_state.ai_players:
+    if not ai["alive"]:
+      dead_entries.append({
+          "name": ai["name"],
+          "aura": ai["aura"],
+          "denom": denominators.get(ai["aura"], 1),
+          "is_me": False
+      })
+
+  # 탈락자 역시 마지막에 뽑았던 아우라 등급이 높은 순으로 정렬
+  dead_entries.sort(key=lambda x: x["denom"], reverse=True)
+
+  if dead_entries:
+    for entry in dead_entries:
+      icon = icons.get(entry["aura"], "✨")
+      denom_str = f"1 in {entry['denom']:,}"
+      if entry["is_me"]:
+        st.markdown(f"- 👻 **{entry['name']}** — 마지막 아우라: {icon} **`{entry['aura']}`** (`{denom_str}`)")
+      else:
+        st.markdown(f"- 👻 **{entry['name']}** — 마지막 아우라: {icon} `{entry['aura']}` (`{denom_str}`)")
+  else:
+    st.caption("아직 탈락자가 없습니다.")
