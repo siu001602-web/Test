@@ -237,9 +237,9 @@ if total_alive <= 1 or (stage == 4 and total_alive <= 1):
         st.rerun()
 else:
     btn_labels = {
-        1: "🎯 1라운드 진행 (5천만 컷 미만 탈락)",
-        2: "🎯 2라운드 진행 (7천만 컷 미만 탈락)",
-        3: "🎯 3라운드 진행 (1억 컷 미만 탈락)",
+        1: "🎯 1라운드 진행 (5천만 이상 컷 통과)",
+        2: "🎯 2라운드 진행 (7천만 이상 컷 통과)",
+        3: "🎯 3라운드 진행 (1억 이상 컷 통과)",
         4: "🚀 최종 라운드 진행 (매턴 최하위 동시 탈락)"
     }
     
@@ -263,6 +263,7 @@ else:
             target_val = cutoffs[stage]
             
             for target, name, aura, denom in rolls:
+                # 컷라인보다 분모가 작으면(확률이 낮으면) 탈락
                 if denom < target_val:
                     if target == "me":
                         st.session_state.my_alive = False
