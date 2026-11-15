@@ -4,7 +4,7 @@ import streamlit as st
 
 # 페이지 설정
 st.set_page_config(
-    page_title="아우라 AI 배틀로얄 (1만 명 대규모)", page_icon="✨", layout="wide"
+    page_title="아우라 AI 배틀로얄 (스테이지 서바이벌)", page_icon="✨", layout="wide"
 )
 
 # 등급 리스트 정의 (희귀도 높은 순)
@@ -73,20 +73,18 @@ icons = {
     "굿": "👍✨", "희귀": "💧📘", "일반": "⚪📦",
 }
 
-# 1만 명(AI 9,999명 + 나) 자동 생성
-TOTAL_PLAYERS = 10000
-AI_COUNT = TOTAL_PLAYERS - 1
-
-last_names = ["김", "이", "박", "정", "최", "강", "조", "윤", "장", "한", "오", "서", "신", "권", "황", "안", "송", "전", "홍", "유"]
-first_names = ["민준", "서윤", "도윤", "서연", "예준", "지우", "도현", "서현", "주원", "하은", "지호", "지유", "준우", "채원", "현우", "지민", "은우", "민서", "시우", "하윤"]
-
-def generate_ai_names(count):
-  names = set()
-  while len(names) < count:
-    family = random.choice(last_names)
-    given = random.choice(first_names) + random.choice(first_names)
-    names.add(family + given)
-  return list(names)
+AI_NAMES = [
+    "김철수", "이영희", "박민수", "정지은", "최동현", "강서윤", "조민재", "윤서연", "장도현", "한소율",
+    "오지호", "서아린", "신예준", "권나은", "황지후", "안채원", "백도현", "송하은", "문준서", "배서현",
+    "유도윤", "홍채은", "류지호", "전서우", "손민준", "허유진", "고시우", "남지안", "심재원", "엄하윤",
+    "변도윤", "여서윤", "석민준", "표채은", "국준서", "구서현", "나도윤", "라채은", "마지호", "방서우",
+    "사민준", "아유진", "차시우", "카지안", "타재원", "파하윤", "하도윤", "거서윤", "너민준", "더채은",
+    "러준서", "머서현", "버도윤", "서채은", "어지호", "저서우", "처민준", "커유진", "터시우", "퍼지안",
+    "호재원", "고하윤", "노도윤", "도서윤", "모민준", "보채은", "소준서", "아서현", "자도윤", "차채은",
+    "카지호", "타서우", "파민준", "하유진", "거시우", "너지안", "더재원", "러하윤", "머도윤", "버서윤",
+    "서민준", "어채은", "저준서", "처서현", "커도윤", "터채은", "퍼지호", "호서우", "김민준", "이유진",
+    "박시우", "정지안", "최재원", "강하윤", "조도윤", "윤서윤", "장민준", "한채은", "오민서", "서지훈"
+]
 
 MILLION_ELIGIBLE_ITEMS = [it for it in items if denominators[it] >= 1000000]
 MILLION_ELIGIBLE_WEIGHTS = [max(1, int(7500000000000 / denominators[it])) for it in MILLION_ELIGIBLE_ITEMS]
@@ -95,32 +93,34 @@ def roll_million_luck():
   return random.choices(MILLION_ELIGIBLE_ITEMS, weights=MILLION_ELIGIBLE_WEIGHTS, k=1)[0]
 
 def init_game():
-  st.session_state.round_num = 0
+  st.session_state.stage = 1  # 1, 2, 3라운드 및 최종 라운드(4)
+  st.session_state.round_num = 1
   st.session_state.my_name = "나 (플레이어)"
   st.session_state.my_aura = "일반"
   st.session_state.my_alive = True
-
-  generated_names = generate_ai_names(AI_COUNT)
   st.session_state.ai_players = [
       {"name": name, "aura": "일반", "alive": True}
-      for name in generated_names
+      for name in AI_NAMES
   ]
-  st.session_state.battle_log = ["게임이 시작되었습니다! 나와 9,999명의 AI가 1만 명 대규모 100만배 행운 배틀을 시작합니다."]
+  st.session_state.battle_log = ["게임 시작! 100명(나 + AI 99명)이 1라운드(5천만 확률 컷)를 시작합니다."]
 
-if "round_num" not in st.session_state:
+if "stage" not in st.session_state:
   init_game()
 
-st.title("✨ 아우라 AI 배틀로얄 (1만 명 대규모 서바이벌)")
-st.write("버튼을 누르면 생존자 전원이 **100만배 행운**으로 아우라를 뽑고, **가장 낮은 등급을 뽑은 인원들이 자동으로 동시 탈락**합니다!")
+st.title("✨ 아우라 AI 스테이지 배틀로얄")
+st.write("각 라운드별 목표 확률(컷라인)을 통과하거나 최종 라운드에서 살아남으세요!")
 
+# 상단 현황판
 alive_ai_count = sum(1 for ai in st.session_state.ai_players if ai["alive"])
 total_alive = alive_ai_count + (1 if st.session_state.my_alive else 0)
 
+stage_names = {1: "1라운드 (5천만 컷)", 2: "2라운드 (7천만 컷)", 3: "3라운드 (1억 컷)", 4: "최종 라운드 (최하위 탈락 서바이벌)"}
+
 c_info1, c_info2, c_info3, c_info4 = st.columns(4)
 with c_info1:
-  st.metric(label="🔄 진행 라운드", value=f"{st.session_state.round_num} 라운드")
+  st.metric(label="🏆 현재 스테이지", value=stage_names.get(st.session_state.stage, "진행 중"))
 with c_info2:
-  st.metric(label="👥 총 생존자 수", value=f"{total_alive:,} / {TOTAL_PLAYERS:,}명")
+  st.metric(label="👥 총 생존자 수", value=f"{total_alive} / 100명")
 with c_info3:
   st.metric(label="🙋 내 상태", value="🟢 생존 중" if st.session_state.my_alive else "👻 탈락 (관전 중)")
 with c_info4:
@@ -128,7 +128,8 @@ with c_info4:
 
 st.divider()
 
-if total_alive <= 1:
+# 게임 종료 체크
+if total_alive <= 1 or (st.session_state.stage == 4 and total_alive <= 1):
   winner_name = "없음 (전원 동시 탈락)"
   if st.session_state.my_alive:
     winner_name = f"👑 {st.session_state.my_name} ({st.session_state.my_aura})"
@@ -141,11 +142,16 @@ if total_alive <= 1:
     init_game()
     st.rerun()
 else:
-  btn_label = (
-      "🚀 1만 명 전원 100만배 행운 가챠 & 최하위 자동 탈락 진행"
-      if st.session_state.my_alive
-      else "👁️ [관전 모드] 남은 인원 1만 명 가챠 & 최하위 자동 탈락 진행"
-  )
+  # 스테이지별 버튼 레이블 및 액션 정의
+  if st.session_state.stage == 1:
+    btn_label = "🎯 1라운드 시작 (5천만 확률보다 낮은 아우라 뽑기)"
+  elif st.session_state.stage == 2:
+    btn_label = "🎯 2라운드 시작 (7천만 확률보다 낮은 아우라 뽑기)"
+  elif st.session_state.stage == 3:
+    btn_label = "🎯 3라운드 시작 (1억 확률보다 낮은 아우라 뽑기)"
+  else:
+    btn_label = "🚀 최종 라운드 진행 (매 턴 최하위 자동 탈락)"
+
   if st.button(btn_label, type="primary", use_container_width=True):
     st.session_state.round_num += 1
     round_rolls = []
@@ -161,41 +167,68 @@ else:
         ai["aura"] = ai_roll
         round_rolls.append((ai, ai["name"], ai_roll, denominators[ai_roll]))
 
-    if round_rolls:
-      min_denom = min(r[3] for r in round_rolls)
-      eliminated_names = []
-      elim_count = 0
+    # 스테이지별 판정 로직
+    if st.session_state.stage in [1, 2, 3]:
+      # 컷라인 설정: 숫자가 클수록 희귀함 (요청하신 "~보다 낮은" = 분모 값이 기준보다 크거나 같아야 합격)
+      # 1라운드: 5천만(50,000,000) 이상 / 2라운드: 7천만(70,000,000) 이상 / 3라운드: 1억(100,000,000) 이상
+      thresholds = {1: 50000000, 2: 70000000, 3: 100000000}
+      target_denom = thresholds[st.session_state.stage]
 
+      eliminated_names = []
       for target, name, aura_name, denom in round_rolls:
-        if denom == min_denom:
-          elim_count += 1
+        if denom < target_denom:  # 기준보다 확률이 높고(분모가 작고) 희귀하지 않으면 탈락
           if target == "me":
             st.session_state.my_alive = False
             eliminated_names.append(f"🙋 {name} [{aura_name}]")
           else:
             target["alive"] = False
-            # 지면 로그가 너무 길어지지 않게 최대 5명만 이름 표기
             if len(eliminated_names) < 5:
               eliminated_names.append(f"{name} [{aura_name}]")
 
-      summary_str = ", ".join(eliminated_names)
-      if elim_count > 5:
-        summary_str += f" 외 {elim_count - 5}명"
-
-      log_msg = f"[Round {st.session_state.round_num}] 최하위 등급 (1 in {min_denom:,}) 탈락 ({elim_count}명): {summary_str}"
+      new_total_alive = (1 if st.session_state.my_alive else 0) + sum(1 for ai in st.session_state.ai_players if ai["alive"])
+      log_msg = f"[Stage {st.session_state.stage}] 컷라인 통과 실패자 탈락! 남은 생존자: {new_total_alive}명"
       st.session_state.battle_log.insert(0, log_msg)
+
+      # 다음 스테이지로 넘어갈 조건 체크
+      if st.session_state.stage == 1 and new_total_alive <= 50:
+        st.session_state.stage = 2
+        st.session_state.battle_log.insert(0, "🔥 2라운드 진입! 컷라인이 7천만으로 강화됩니다.")
+      elif st.session_state.stage == 2 and new_total_alive <= 25:
+        st.session_state.stage = 3
+        st.session_state.battle_log.insert(0, "🔥 3라운드 진입! 컷라인이 1억으로 강화됩니다.")
+      elif st.session_state.stage == 3 and new_total_alive <= 10:
+        st.session_state.stage = 4
+        st.session_state.battle_log.insert(0, "⚡ 최종 라운드 진입! 이제 매 턴 최하위 아우라를 뽑은 인원이 동시 탈락합니다.")
+
+    else:
+      # 최종 라운드: 가장 확률 낮은(분모가 작은) 아우라 동시 탈락
+      if round_rolls:
+        min_denom = min(r[3] for r in round_rolls)
+        eliminated_names = []
+        for target, name, aura_name, denom in round_rolls:
+          if denom == min_denom:
+            if target == "me":
+              st.session_state.my_alive = False
+              eliminated_names.append(f"🙋 {name} [{aura_name}]")
+            else:
+              target["alive"] = False
+              if len(eliminated_names) < 5:
+                eliminated_names.append(f"{name} [{aura_name}]")
+
+        log_msg = f"[최종 라운드] 최하위 등급 (1 in {min_denom:,}) 탈락: {', '.join(eliminated_names)}"
+        st.session_state.battle_log.insert(0, log_msg)
 
     st.rerun()
 
-st.subheader("📜 실시간 탈락 및 배틀 로그")
+st.subheader("📜 실시간 배틀 로그")
 with st.container(border=True):
   for log in st.session_state.battle_log[:8]:
     st.write(log)
 
 st.divider()
 
-st.subheader("🏆 전체 참가자 현황 (상위 순위)")
-tab_alive_list, tab_dead_list = st.tabs([f"🟢 생존자 순위 (상위 표시)", f"👻 최근 탈락자 및 관전"])
+st.subheader("🏆 전체 참가자 현황 (가장 잘 뜬 순위)")
+tab_alive_list, tab_dead_list = st.tabs([f"🟢 생존자 순위 ({total_alive}명)", f"👻 탈락자 현황"])
 
 with tab_alive_list:
   alive_entries = []
@@ -218,8 +251,7 @@ with tab_alive_list:
   alive_entries.sort(key=lambda x: x["denom"], reverse=True)
 
   if alive_entries:
-    st.caption(f"총 생존자 {len(alive_entries):,}명 중 가장 잘 뜬 상위 50명만 표시됩니다.")
-    for rank, entry in enumerate(alive_entries[:50], start=1):
+    for rank, entry in enumerate(alive_entries, start=1):
       icon = icons.get(entry["aura"], "✨")
       denom_str = f"1 in {entry['denom']:,}"
       if entry["is_me"]:
@@ -250,7 +282,6 @@ with tab_dead_list:
   dead_entries.sort(key=lambda x: x["denom"], reverse=True)
 
   if dead_entries:
-    st.caption(f"총 탈락자 {len(dead_entries):,}명 중 최근 상위 50명만 표시됩니다.")
     for entry in dead_entries[:50]:
       icon = icons.get(entry["aura"], "✨")
       denom_str = f"1 in {entry['denom']:,}"
