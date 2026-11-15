@@ -195,4 +195,3 @@ all_alive.sort(key=lambda x: x["denom"], reverse=True)
 for i, p in enumerate(all_alive[:10], 1):
   ic = icons.get(p["aura"], "✨")
   st.write(f"{i}. **{p['name']}** — {ic} `{p['aura']}` (1 in {p['denom']:,})")
-:
