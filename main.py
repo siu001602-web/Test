@@ -1,6 +1,6 @@
-from datetime import datetime
-import random
 import streamlit as st
+import random
+from datetime import datetime
 
 # 페이지 설정
 st.set_page_config(
@@ -86,7 +86,6 @@ AI_NAMES = [
     "박시우", "정지안", "최재원", "강하윤", "조도윤", "윤서윤", "장민준", "한채은", "오민서", "서지훈"
 ]
 
-# 100만배 행운 적용 가챠 함수 (1/1,000,000 이상 등급만 실제 확률 비율대로 추첨)
 MILLION_ELIGIBLE_ITEMS = [it for it in items if denominators[it] >= 1000000]
 MILLION_ELIGIBLE_WEIGHTS = [max(1, int(7500000000000 / denominators[it])) for it in MILLION_ELIGIBLE_ITEMS]
 
@@ -94,7 +93,6 @@ def roll_million_luck():
   return random.choices(MILLION_ELIGIBLE_ITEMS, weights=MILLION_ELIGIBLE_WEIGHTS, k=1)[0]
 
 def init_game():
-  st.session_state.battle_initialized = True
   st.session_state.round_num = 0
   st.session_state.my_name = "나 (플레이어)"
   st.session_state.my_aura = "일반"
@@ -105,7 +103,8 @@ def init_game():
   ]
   st.session_state.battle_log = ["게임이 시작되었습니다! 나와 100명의 AI가 100만배 행운 배틀을 시작합니다."]
 
-if "battle_initialized" not in st.session_state:
+# 세션 상태 초기화 체크
+if "round_num" not in st.session_state:
   init_game()
 
 st.title("✨ 아우라 AI 배틀로얄 (100만배 행운 서바이벌)")
@@ -127,7 +126,6 @@ with c_info4:
 
 st.divider()
 
-# 게임 종료 여부 체크 및 실행 버튼
 if total_alive <= 1:
   winner_name = "없음 (전원 동시 탈락)"
   if st.session_state.my_alive:
@@ -148,22 +146,19 @@ else:
   )
   if st.button(btn_label, type="primary", use_container_width=True):
     st.session_state.round_num += 1
-    round_rolls = []  # (참가자 객체/구분, 이름, 뽑은 아우라, 희귀도 분모)
+    round_rolls = []
 
-    # 1. 나 뽑기 (생존 상태일 때만)
     if st.session_state.my_alive:
       my_roll = roll_million_luck()
       st.session_state.my_aura = my_roll
       round_rolls.append(("me", st.session_state.my_name, my_roll, denominators[my_roll]))
 
-    # 2. 생존 AI들 뽑기
     for ai in st.session_state.ai_players:
       if ai["alive"]:
         ai_roll = roll_million_luck()
         ai["aura"] = ai_roll
         round_rolls.append((ai, ai["name"], ai_roll, denominators[ai_roll]))
 
-    # 3. 가장 확률 낮은(=분모 숫자가 가장 작은) 아우라 판별 및 동시 탈락 처리
     if round_rolls:
       min_denom = min(r[3] for r in round_rolls)
       eliminated_names = []
@@ -178,14 +173,11 @@ else:
             eliminated_names.append(f"{name} [{aura_name}]")
 
       elim_summary = ", ".join(eliminated_names)
-      log_msg = (
-          f"[Round {st.session_state.round_num}] 최하위 등급 (1 in {min_denom:,}) 탈락 ({len(eliminated_names)}명): {elim_summary}"
-      )
+      log_msg = f"[Round {st.session_state.round_num}] 최하위 등급 (1 in {min_denom:,}) 탈락 ({len(eliminated_names)}명): {elim_summary}"
       st.session_state.battle_log.insert(0, log_msg)
 
     st.rerun()
 
-# 실시간 배틀 로그
 st.subheader("📜 실시간 탈락 및 배틀 로그")
 with st.container(border=True):
   for log in st.session_state.battle_log[:8]:
@@ -193,7 +185,6 @@ with st.container(border=True):
 
 st.divider()
 
-# 전체 참가자 현황 (가장 잘 뜬 사람 순 정렬)
 st.subheader("🏆 전체 참가자 현황 (가장 잘 뜬 순위)")
 tab_alive_list, tab_dead_list = st.tabs([f"🟢 생존자 순위 ({total_alive}명)", f"👻 탈락자 및 관전 ({101 - total_alive}명)"])
 
@@ -215,7 +206,6 @@ with tab_alive_list:
           "is_me": False
       })
 
-  # 희귀도(분모) 높은 순으로 정렬 (가장 잘 뜬 사람이 맨 위)
   alive_entries.sort(key=lambda x: x["denom"], reverse=True)
 
   if alive_entries:
@@ -247,7 +237,6 @@ with tab_dead_list:
           "is_me": False
       })
 
-  # 탈락자 역시 마지막에 뽑았던 아우라 등급이 높은 순으로 정렬
   dead_entries.sort(key=lambda x: x["denom"], reverse=True)
 
   if dead_entries:
