@@ -1,10 +1,17 @@
+import base64
 from datetime import datetime
-import random
+import hashlib
+json = __import__("json")
+os = __import__("os")
+random = __import__("random")
+sqlite3 = __import__("sqlite3")
+time = __import__("time")
+colorsys = __import__("colorsys")
 import streamlit as st
 
 # 페이지 설정
 st.set_page_config(
-    page_title="아우라 AI 배틀로얄 (1만 명 대규모)", page_icon="✨", layout="wide"
+    page_title="아우라 100인 서바이벌 배틀로얄", page_icon="⚔️", layout="wide"
 )
 
 # 등급 리스트 정의 (희귀도 높은 순)
@@ -50,6 +57,8 @@ denominators = {
     "굿": 5, "희귀": 4, "일반": 2,
 }
 
+base_weights = [max(1, int(7500000000000 / denominators[item])) for item in items]
+
 icons = {
     "𝓣𝓱𝓮 𝓞𝓻𝓲𝓰𝓲𝓷 𝓗𝓪𝓷𝓭": "🖐️✨🌌👑", "𝓓𝓻𝓮𝓪𝓶𝓬𝓪𝓽𝓬𝓱𝓮𝓻": "🕸️🌙✨🦋",
     "사도:베일": "🎃👁️", "수확가": "🎃🗡️", "악몽의 하늘": "🎃🌌",
@@ -73,190 +82,360 @@ icons = {
     "굿": "👍✨", "희귀": "💧📘", "일반": "⚪📦",
 }
 
-# 1만 명(AI 9,999명 + 나) 자동 생성
-TOTAL_PLAYERS = 10000
-AI_COUNT = TOTAL_PLAYERS - 1
+def init_db():
+  conn = sqlite3.connect("survival_users.db", check_same_thread=False)
+  cursor = conn.cursor()
+  cursor.execute("""
+        CREATE TABLE IF NOT EXISTS users (
+            username TEXT PRIMARY KEY,
+            password TEXT,
+            data TEXT
+        )
+    """)
+  conn.commit()
+  conn.close()
 
-last_names = ["김", "이", "박", "정", "최", "강", "조", "윤", "장", "한", "오", "서", "신", "권", "황", "안", "송", "전", "홍", "유"]
-first_names = ["민준", "서윤", "도윤", "서연", "예준", "지우", "도현", "서현", "주원", "하은", "지호", "지유", "준우", "채원", "현우", "지민", "은우", "민서", "시우", "하윤"]
+init_db()
 
-def generate_ai_names(count):
-  names = set()
-  while len(names) < count:
-    family = random.choice(last_names)
-    given = random.choice(first_names) + random.choice(first_names)
-    names.add(family + given)
-  return list(names)
+def hash_password(password):
+  return hashlib.sha256(password.encode()).hexdigest()
 
-MILLION_ELIGIBLE_ITEMS = [it for it in items if denominators[it] >= 1000000]
-MILLION_ELIGIBLE_WEIGHTS = [max(1, int(7500000000000 / denominators[it])) for it in MILLION_ELIGIBLE_ITEMS]
-
-def roll_million_luck():
-  return random.choices(MILLION_ELIGIBLE_ITEMS, weights=MILLION_ELIGIBLE_WEIGHTS, k=1)[0]
-
-def init_game():
-  st.session_state.round_num = 0
-  st.session_state.my_name = "나 (플레이어)"
-  st.session_state.my_aura = "일반"
-  st.session_state.my_alive = True
-
-  generated_names = generate_ai_names(AI_COUNT)
-  st.session_state.ai_players = [
-      {"name": name, "aura": "일반", "alive": True}
-      for name in generated_names
-  ]
-  st.session_state.battle_log = ["게임이 시작되었습니다! 나와 9,999명의 AI가 1만 명 대규모 100만배 행운 배틀을 시작합니다."]
-
-if "round_num" not in st.session_state:
-  init_game()
-
-st.title("✨ 아우라 AI 배틀로얄 (1만 명 대규모 서바이벌)")
-st.write("버튼을 누르면 생존자 전원이 **100만배 행운**으로 아우라를 뽑고, **가장 낮은 등급을 뽑은 인원들이 자동으로 동시 탈락**합니다!")
-
-alive_ai_count = sum(1 for ai in st.session_state.ai_players if ai["alive"])
-total_alive = alive_ai_count + (1 if st.session_state.my_alive else 0)
-
-c_info1, c_info2, c_info3, c_info4 = st.columns(4)
-with c_info1:
-  st.metric(label="🔄 진행 라운드", value=f"{st.session_state.round_num} 라운드")
-with c_info2:
-  st.metric(label="👥 총 생존자 수", value=f"{total_alive:,} / {TOTAL_PLAYERS:,}명")
-with c_info3:
-  st.metric(label="🙋 내 상태", value="🟢 생존 중" if st.session_state.my_alive else "👻 탈락 (관전 중)")
-with c_info4:
-  st.metric(label="✨ 내 마지막 아우라", value=st.session_state.my_aura)
-
-st.divider()
-
-if total_alive <= 1:
-  winner_name = "없음 (전원 동시 탈락)"
-  if st.session_state.my_alive:
-    winner_name = f"👑 {st.session_state.my_name} ({st.session_state.my_aura})"
-  elif alive_ai_count == 1:
-    last_ai = [ai for ai in st.session_state.ai_players if ai["alive"]][0]
-    winner_name = f"👑 {last_ai['name']} ({last_ai['aura']})"
-
-  st.success(f"🎉 **배틀 종료! 최종 우승자: {winner_name}**")
-  if st.button("🔄 새 게임 시작하기", type="primary", use_container_width=True):
-    init_game()
-    st.rerun()
-else:
-  btn_label = (
-      "🚀 1만 명 전원 100만배 행운 가챠 & 최하위 자동 탈락 진행"
-      if st.session_state.my_alive
-      else "👁️ [관전 모드] 남은 인원 1만 명 가챠 & 최하위 자동 탈락 진행"
+def save_user_data_to_db():
+  if not st.session_state.get("logged_in", False):
+    return
+  username = st.session_state.username
+  save_data = {
+      "coins": st.session_state.get("coins", 0),
+      "wins": st.session_state.get("wins", 0),
+  }
+  conn = sqlite3.connect("survival_users.db", check_same_thread=False)
+  cursor = conn.cursor()
+  cursor.execute(
+      "UPDATE users SET data = ? WHERE username = ?",
+      (json.dumps(save_data, ensure_ascii=False), username),
   )
-  if st.button(btn_label, type="primary", use_container_width=True):
-    st.session_state.round_num += 1
-    round_rolls = []
+  conn.commit()
+  conn.close()
 
-    if st.session_state.my_alive:
-      my_roll = roll_million_luck()
-      st.session_state.my_aura = my_roll
-      round_rolls.append(("me", st.session_state.my_name, my_roll, denominators[my_roll]))
+if "logged_in" not in st.session_state:
+  st.session_state.logged_in = False
+if "username" not in st.session_state:
+  st.session_state.username = ""
+if "coins" not in st.session_state:
+  st.session_state.coins = 1000
+if "wins" not in st.session_state:
+  st.session_state.wins = 0
 
-    for ai in st.session_state.ai_players:
-      if ai["alive"]:
-        ai_roll = roll_million_luck()
-        ai["aura"] = ai_roll
-        round_rolls.append((ai, ai["name"], ai_roll, denominators[ai_roll]))
+# 서바이벌 게임 상태 변수
+if "survival_stage" not in st.session_state:
+  st.session_state.survival_stage = 0  # 0: 대기중, 1: 1라운드, 2: 2라운드, 3: 3라운드(결승), 4: 최종 종료
+if "player_alive" not in st.session_state:
+  st.session_state.player_alive = True
+if "ai_survivors" not in st.session_state:
+  st.session_state.ai_survivors = []
+if "player_aura" not in st.session_state:
+  st.session_state.player_aura = None
+if "survival_logs" not in st.session_state:
+  st.session_state.survival_logs = []
+if "round_processed" not in st.session_state:
+  st.session_state.round_processed = False
+if "final_winner_info" not in st.session_state:
+  st.session_state.final_winner_info = None
 
-    if round_rolls:
-      min_denom = min(r[3] for r in round_rolls)
-      eliminated_names = []
-      elim_count = 0
+if not st.session_state.logged_in:
+  st.title("⚔️ 아우라 100인 서바이벌 배틀로얄 — 로그인")
+  l_user = st.text_input("아이디", key="login_user")
+  l_pass = st.text_input("비밀번호", type="password", key="login_pass")
+  col_l1, col_l2 = st.columns(2)
+  with col_l1:
+    if st.button("로그인", type="primary", use_container_width=True):
+      if l_user.strip() and l_pass.strip():
+        conn = sqlite3.connect("survival_users.db", check_same_thread=False)
+        cursor = conn.cursor()
+        cursor.execute("SELECT password, data FROM users WHERE username = ?", (l_user,))
+        row = cursor.fetchone()
+        conn.close()
+        if row and row[0] == hash_password(l_pass):
+          st.session_state.logged_in = True
+          st.session_state.username = l_user
+          saved_data = json.loads(row[1])
+          st.session_state.coins = saved_data.get("coins", 1000)
+          st.session_state.wins = saved_data.get("wins", 0)
+          st.rerun()
+        else:
+          st.error("아이디 또는 비밀번호가 올바르지 않습니다.")
+  with col_l2:
+    if st.button("회원가입", type="secondary", use_container_width=True):
+      if l_user.strip() and l_pass.strip():
+        conn = sqlite3.connect("survival_users.db", check_same_thread=False)
+        cursor = conn.cursor()
+        cursor.execute("SELECT username FROM users WHERE username = ?", (l_user,))
+        if cursor.fetchone():
+          st.error("이미 존재하는 아이디입니다.")
+        else:
+          cursor.execute("INSERT INTO users (username, password, data) VALUES (?, ?, ?)",
+                         (l_user, hash_password(l_pass), json.dumps({"coins": 1000, "wins": 0})))
+          conn.commit()
+          conn.close()
+          st.success("회원가입 완료! 로그인해주세요.")
+  st.stop()
 
-      for target, name, aura_name, denom in round_rolls:
-        if denom == min_denom:
-          elim_count += 1
-          if target == "me":
-            st.session_state.my_alive = False
-            eliminated_names.append(f"🙋 {name} [{aura_name}]")
-          else:
-            target["alive"] = False
-            # 지면 로그가 너무 길어지지 않게 최대 5명만 이름 표기
-            if len(eliminated_names) < 5:
-              eliminated_names.append(f"{name} [{aura_name}]")
+# 백만배 행운 뽑기 함수 (서바이벌 전용)
+def roll_with_million_luck():
+  current_weights = list(base_weights)
+  luck_mult = 1000000
+  eligible_indices = [idx for idx, item in enumerate(items) if denominators[item] >= luck_mult]
+  
+  for idx in range(len(items)):
+    if idx not in eligible_indices:
+      current_weights[idx] = 0
+    else:
+      current_weights[idx] = current_weights[idx] * luck_mult
+      
+  return random.choices(items, weights=current_weights, k=1)[0]
 
-      summary_str = ", ".join(eliminated_names)
-      if elim_count > 5:
-        summary_str += f" 외 {elim_count - 5}명"
+# AI 라운드 시뮬레이션 함수 (목표 인원수만큼 통과할 때까지 뽑기 진행)
+def simulate_ai_round(ai_list, threshold_denom, target_survivor_count):
+  passed_ais = []
+  # 실제 경쟁 느낌을 위해 각 AI가 여러 번 시도하여 조건을 달성한 선착순 인원을 뽑음
+  candidates = list(ai_list)
+  random.shuffle(candidates)
+  
+  # 라운드마다 최대 20턴 동안 AI들이 뽑기를 시도해 선착순 마감
+  for _ in range(25):
+    if len(passed_ais) >= target_survivor_count:
+      break
+    for ai_name in list(candidates):
+      if len(passed_ais) >= target_survivor_count:
+        break
+      res = roll_with_million_luck()
+      if denominators[res] >= threshold_denom:
+        passed_ais.append({"name": ai_name, "aura": res, "denom": denominators[res]})
+        candidates.remove(ai_name)
+        
+  # 만약 운이 나빠 목표 인원을 못 채웠다면 남은 AI 중 상위 결과로 채움
+  while len(passed_ais) < target_survivor_count and candidates:
+    ai_name = candidates.pop(0)
+    res = roll_with_million_luck()
+    passed_ais.append({"name": ai_name, "aura": res, "denom": denominators[res]})
+    
+  return passed_ais
 
-      log_msg = f"[Round {st.session_state.round_num}] 최하위 등급 (1 in {min_denom:,}) 탈락 ({elim_count}명): {summary_str}"
-      st.session_state.battle_log.insert(0, log_msg)
+st.title("⚔️ 아우라 100인 서바이벌 배틀로얄")
 
-    st.rerun()
-
-st.subheader("📜 실시간 탈락 및 배틀 로그")
-with st.container(border=True):
-  for log in st.session_state.battle_log[:8]:
-    st.write(log)
-
+status_badge = "🟢 생존 중" if st.session_state.player_alive else "💀 탈락 (관전 모드)"
+st.markdown(
+    f"👤 참가자: **`{st.session_state.username}`**님 ({status_badge}) | "
+    f"💰 코인: **{st.session_state.coins} G** | 🏆 우승 횟수: **{st.session_state.wins}회**"
+)
 st.divider()
 
-st.subheader("🏆 전체 참가자 현황 (상위 순위)")
-tab_alive_list, tab_dead_list = st.tabs([f"🟢 생존자 순위 (상위 표시)", f"👻 최근 탈락자 및 관전"])
+# 0단계: 게임 시작 전 (대기실)
+if st.session_state.survival_stage == 0:
+  st.subheader("🎯 배틀로얄 규칙 안내")
+  st.markdown("""
+  - **총 100명** (플레이어 1명 + AI 99명)이 참전하는 목숨을 건 서바이벌!
+  - 모든 뽑기에는 **백만배 행운(1,000,000배)**이 기본 적용됩니다.
+  - **1라운드**: 5천만($50,000,000$) 이상 아우라 뽑기 (**선착순 50명** 생존)
+  - **2라운드**: 7천만($70,000,000$) 이상 아우라 뽑기 (**선착순 25명** 생존)
+  - **3라운드 (결승)**: 남은 생존자들과 아우라 확률 비교! **가장 확률이 높은(희귀도가 낮은) 아우라를 뽑은 사람은 탈락**, **1억($100,000,000$) 이하 아우라를 뽑은 사람은 결승 직행!**
+  - ⚠️ **중도 탈락 시에도 경기는 멈추지 않으며, 관전 모드로 전환되어 AI들의 최종 결승전까지 계속 진행됩니다.**
+  """)
+  
+  if st.button("🚀 100인 배틀로얄 시작하기", type="primary", use_container_width=True):
+    st.session_state.ai_survivors = [f"AI_참가자_{i:02d}" for i in range(1, 100)]
+    st.session_state.player_alive = True
+    st.session_state.round_processed = False
+    st.session_state.final_winner_info = None
+    st.session_state.survival_stage = 1
+    st.session_state.survival_logs = ["[게임 시작] 총 100명(플레이어 + AI 99명)이 1라운드 전장에 입장했습니다!"]
+    st.rerun()
 
-with tab_alive_list:
-  alive_entries = []
-  if st.session_state.my_alive:
-    alive_entries.append({
-        "name": f"🙋 {st.session_state.my_name}",
-        "aura": st.session_state.my_aura,
-        "denom": denominators.get(st.session_state.my_aura, 1),
-        "is_me": True
-    })
-  for ai in st.session_state.ai_players:
-    if ai["alive"]:
-      alive_entries.append({
-          "name": ai["name"],
-          "aura": ai["aura"],
-          "denom": denominators.get(ai["aura"], 1),
-          "is_me": False
+# 1라운드
+elif st.session_state.survival_stage == 1:
+  st.subheader("🟢 1라운드: 5천만($50,000,000$) 이상 아우라 생존전 (선착순 50명)")
+  
+  if not st.session_state.round_processed:
+    btn_label = "🎲 1라운드 아우라 뽑기 진행!" if st.session_state.player_alive else "👁️ 1라운드 AI 경기 관전하기"
+    if st.button(btn_label, type="primary", use_container_width=True):
+      p_passed = False
+      if st.session_state.player_alive:
+        p_result = roll_with_million_luck()
+        p_denom = denominators[p_result]
+        st.session_state.player_aura = p_result
+        p_passed = p_denom >= 50000000
+        
+        if p_passed:
+          st.session_state.survival_logs.insert(0, f"✅ [플레이어 통과] [{p_result}] (가치: {p_denom:,}) 획득!")
+        else:
+          st.session_state.player_alive = False
+          st.session_state.survival_logs.insert(0, f"💀 [플레이어 탈락] [{p_result}] (가치: {p_denom:,}) — 5천만 미달! 관전 모드로 전환됩니다.")
+
+      # 플레이어 통과 여부에 따라 AI 통과 인원 조절 (총 50명 맞추기)
+      ai_target = 49 if p_passed else 50
+      passed_ais = simulate_ai_round(st.session_state.ai_survivors, 50000000, ai_target)
+      st.session_state.ai_survivors = [a["name"] for a in passed_ais]
+      
+      top_ai = max(passed_ais, key=lambda x: x["denom"])
+      st.session_state.survival_logs.insert(
+          0, f"📢 [1라운드 마감] 선착순 50명 확정! (AI 최고 기록: {top_ai['name']} - {top_ai['aura']})"
+      )
+      st.session_state.round_processed = True
+      st.rerun()
+  else:
+    if st.session_state.player_alive:
+      st.success(f"🎉 1라운드 생존 성공! [{st.session_state.player_aura}] 획득으로 50인에 안착했습니다!")
+    else:
+      st.error(f"💀 1라운드에서 탈락하셨습니다 ({st.session_state.player_aura}). 하지만 경기는 계속됩니다! AI 50명의 2라운드를 관전하세요.")
+      
+    if st.button("➡️ 2라운드로 이동", type="primary", use_container_width=True):
+      st.session_state.round_processed = False
+      st.session_state.survival_stage = 2
+      st.rerun()
+
+# 2라운드
+elif st.session_state.survival_stage == 2:
+  st.subheader("🟡 2라운드: 7천만($70,000,000$) 이상 아우라 생존전 (선착순 25명)")
+  
+  if not st.session_state.round_processed:
+    btn_label = "🎲 2라운드 아우라 뽑기 진행!" if st.session_state.player_alive else "👁️ 2라운드 AI 경기 관전하기"
+    if st.button(btn_label, type="primary", use_container_width=True):
+      p_passed = False
+      if st.session_state.player_alive:
+        p_result = roll_with_million_luck()
+        p_denom = denominators[p_result]
+        st.session_state.player_aura = p_result
+        p_passed = p_denom >= 70000000
+        
+        if p_passed:
+          st.session_state.survival_logs.insert(0, f"✅ [플레이어 2R 통과] [{p_result}] (가치: {p_denom:,}) 획득!")
+        else:
+          st.session_state.player_alive = False
+          st.session_state.survival_logs.insert(0, f"💀 [플레이어 2R 탈락] [{p_result}] (가치: {p_denom:,}) — 7천만 미달! 관전 모드로 전환됩니다.")
+
+      ai_target = 24 if p_passed else 25
+      passed_ais = simulate_ai_round(st.session_state.ai_survivors, 70000000, ai_target)
+      st.session_state.ai_survivors = [a["name"] for a in passed_ais]
+      
+      top_ai = max(passed_ais, key=lambda x: x["denom"])
+      st.session_state.survival_logs.insert(
+          0, f"📢 [2라운드 마감] 결승 진출자 25명 확정! (AI 최고 기록: {top_ai['name']} - {top_ai['aura']})"
+      )
+      st.session_state.round_processed = True
+      st.rerun()
+  else:
+    if st.session_state.player_alive:
+      st.success(f"🎉 2라운드 생존 성공! [{st.session_state.player_aura}] 획득으로 최종 결승전(25인)에 진출합니다!")
+    else:
+      st.warning(f"👁️ [관전 모드] 현재 AI 생존자 25명이 최종 결승전 진출을 확정지었습니다.")
+      
+    if st.button("🔥 3라운드 (최종 결승전)으로 이동", type="primary", use_container_width=True):
+      st.session_state.round_processed = False
+      st.session_state.survival_stage = 3
+      st.rerun()
+
+# 3라운드 (결승전)
+elif st.session_state.survival_stage == 3:
+  st.subheader("🔴 3라운드: 최후의 결승전 (확률 비교 & 1억 이하 직행 룰)")
+  st.markdown("""
+  - **결승 판정 규칙**: 25명의 결승 진출자가 마지막 아우라를 뽑습니다.
+  - **1억($100,000,000$) 이하** 아우라를 뽑은 참가자는 **결승 직행(생존)** 처리됩니다.
+  - 나머지 참가자 중 **가장 확률이 높은(희귀도가 낮은) 아우라를 뽑은 최하위 1명**이 탈락하며, 살아남은 최후의 생존자들이 우승을 차지합니다!
+  """)
+
+  btn_label = "🏆 결승전 최종 아우라 뽑기 및 판정!" if st.session_state.player_alive else "👁️ 결승전 최종 결과 관전하기!"
+  if st.button(btn_label, type="primary", use_container_width=True):
+    contestants = []
+    
+    if st.session_state.player_alive:
+      p_result = roll_with_million_luck()
+      p_denom = denominators[p_result]
+      st.session_state.player_aura = p_result
+      contestants.append({
+          "name": st.session_state.username,
+          "aura": p_result,
+          "denom": p_denom,
+          "is_player": True,
+          "direct_pass": p_denom <= 100000000
       })
 
-  alive_entries.sort(key=lambda x: x["denom"], reverse=True)
-
-  if alive_entries:
-    st.caption(f"총 생존자 {len(alive_entries):,}명 중 가장 잘 뜬 상위 50명만 표시됩니다.")
-    for rank, entry in enumerate(alive_entries[:50], start=1):
-      icon = icons.get(entry["aura"], "✨")
-      denom_str = f"1 in {entry['denom']:,}"
-      if entry["is_me"]:
-        st.markdown(f"**{rank}위. {entry['name']}** — {icon} **`{entry['aura']}`** (`{denom_str}`)")
-      else:
-        st.markdown(f"{rank}위. **{entry['name']}** — {icon} `{entry['aura']}` (`{denom_str}`)")
-  else:
-    st.info("생존자가 없습니다.")
-
-with tab_dead_list:
-  dead_entries = []
-  if not st.session_state.my_alive:
-    dead_entries.append({
-        "name": f"🙋 {st.session_state.my_name} (관전 중)",
-        "aura": st.session_state.my_aura,
-        "denom": denominators.get(st.session_state.my_aura, 1),
-        "is_me": True
-    })
-  for ai in st.session_state.ai_players:
-    if not ai["alive"]:
-      dead_entries.append({
-          "name": ai["name"],
-          "aura": ai["aura"],
-          "denom": denominators.get(ai["aura"], 1),
-          "is_me": False
+    for ai_name in st.session_state.ai_survivors:
+      ai_item = roll_with_million_luck()
+      ai_denom = denominators[ai_item]
+      contestants.append({
+          "name": ai_name,
+          "aura": ai_item,
+          "denom": ai_denom,
+          "is_player": False,
+          "direct_pass": ai_denom <= 100000000
       })
 
-  dead_entries.sort(key=lambda x: x["denom"], reverse=True)
+    # 직행(1억 이하)이 아닌 참가자들 중 가장 가치(denom)가 낮은 사람(가장 확률이 높은 사람) 탈락 판정
+    non_direct = [c for c in contestants if not c["direct_pass"]]
+    eliminated_person = min(non_direct, key=lambda x: x["denom"]) if non_direct else None
 
-  if dead_entries:
-    st.caption(f"총 탈락자 {len(dead_entries):,}명 중 최근 상위 50명만 표시됩니다.")
-    for entry in dead_entries[:50]:
-      icon = icons.get(entry["aura"], "✨")
-      denom_str = f"1 in {entry['denom']:,}"
-      if entry["is_me"]:
-        st.markdown(f"- 👻 **{entry['name']}** — 마지막 아우라: {icon} **`{entry['aura']}`** (`{denom_str}`)")
+    # 최고 희귀도 아우라를 뽑은 MVP 찾기
+    mvp_contestant = max(contestants, key=lambda x: x["denom"])
+
+    player_survived = False
+    if st.session_state.player_alive:
+      if eliminated_person and eliminated_person["is_player"]:
+        st.session_state.player_alive = False
+        st.session_state.survival_logs.insert(0, f"💀 [결승 탈락] 플레이어님이 가장 확률이 높은 [{st.session_state.player_aura}]을(를) 뽑아 아쉽게 탈락했습니다!")
       else:
-        st.markdown(f"- 👻 **{entry['name']}** — 마지막 아우라: {icon} `{entry['aura']}` (`{denom_str}`)")
-  else:
-    st.caption("아직 탈락자가 없습니다.")
+        player_survived = True
+        st.session_state.wins += 1
+        st.session_state.coins += 5000
+        save_user_data_to_db()
+        st.session_state.survival_logs.insert(0, f"🏆 [결승 최종 생존!] 플레이어님이 [{st.session_state.player_aura}]으로 최종 생존에 성공했습니다! (+5,000 G)")
+
+    elim_msg = f"{eliminated_person['name']} ({eliminated_person['aura']})" if eliminated_person else "없음 (전원 1억 이하 직행!)"
+    st.session_state.survival_logs.insert(
+        0, f"👑 [대회 종료] 결승 MVP: {mvp_contestant['name']} [{mvp_contestant['aura']}] | 결승 탈락자: {elim_msg}"
+    )
+    st.session_state.final_winner_info = {
+        "mvp": mvp_contestant,
+        "eliminated": eliminated_person,
+        "player_survived": player_survived,
+        "all_contestants": sorted(contestants, key=lambda x: x["denom"], reverse=True)
+    }
+    st.session_state.survival_stage = 4
+    st.rerun()
+
+# 4단계: 최종 결과 화면
+elif st.session_state.survival_stage == 4:
+  st.subheader("🏁 100인 아우라 서바이벌 최종 결과")
+  info = st.session_state.final_winner_info
+
+  if info:
+    if info["player_survived"]:
+      st.balloons()
+      st.success(f"🏆 축하합니다! [{st.session_state.player_aura}]으로 최종 생존하셨습니다! (+5,000 G 획득)")
+    else:
+      st.info("👁️ 관전 종료! 당신은 중도 탈락했지만 100인 배틀로얄이 끝까지 진행되어 최종 승자가 가려졌습니다.")
+
+    mvp = info["mvp"]
+    elim = info["eliminated"]
+    col_r1, col_r2 = st.columns(2)
+    with col_r1:
+      st.metric("👑 결승전 최고 희귀도 MVP", f"{mvp['name']}", f"{mvp['aura']} (1 in {mvp['denom']:,})")
+    with col_r2:
+      if elim:
+        st.metric("💀 결승전 최하위 탈락자", f"{elim['name']}", f"{elim['aura']} (1 in {elim['denom']:,})")
+      else:
+        st.metric("💀 결승전 최하위 탈락자", "없음", "전원 1억 이하 직행!")
+
+    with st.expander("📊 결승 진출자 25명 전체 결과표 보기", expanded=True):
+      for idx, c in enumerate(info["all_contestants"], 1):
+        tag = "✨ [1억 이하 직행]" if c["direct_pass"] else ("💀 [최하위 탈락]" if elim and c["name"] == elim["name"] else "✅ [생존]")
+        me_mark = " 👈 (나)" if c["is_player"] else ""
+        st.write(f"**{idx}위.** {c['name']}{me_mark} — {icons.get(c['aura'], '✨')} **{c['aura']}** (`1 in {c['denom']:,}`) | {tag}")
+
+  if st.button("🔄 새 배틀로얄 시작하기", type="primary", use_container_width=True):
+    st.session_state.survival_stage = 0
+    st.rerun()
+
+st.divider()
+st.markdown("### 📜 실시간 배틀로얄 중계 로그")
+for log in st.session_state.survival_logs[:12]:
+  st.text(log)
